@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtualenv
+.venv/
+venv/
+ENV/
+env/
+
+# Build artefacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Credentials, certs and TLS material — NEVER commit
+*.pem
+*.crt
+*.cert
+*.key
+*.p12
+*.pfx
+cert.pem
+.env
+.env.local
+.env.*.local
+
+# Live Claude Desktop config (the example.json is fine to commit; the live one is not)
+claude_desktop_config.json
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Local scratch
+scratch/
+tmp/
+*.bak
