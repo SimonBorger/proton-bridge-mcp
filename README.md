@@ -6,6 +6,22 @@ A local Model Context Protocol (MCP) server that lets Claude (or any MCP client)
 
 Proton Mail's end-to-end encryption is great for privacy and a problem for automation: there's no public IMAP endpoint and no first-party API. **Proton Mail Bridge** solves that by exposing your decrypted mail over loopback IMAP/SMTP on your own machine. This MCP server wraps that loopback in a small, hardened tool surface that Claude can drive.
 
+## Why this one?
+
+Several other Proton MCP servers exist on GitHub. Most are functional and some have far larger tool surfaces. This one is built for a different priority: **security and supply-chain hygiene over feature count**, on the assumption that the people most likely to want to plug an LLM into their email are also the people who most need a credible threat model and a reproducible install.
+
+| Concern                  | This server                                                                                                                          | Typical alternative                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| Bridge TLS               | Pinned to Bridge's self-signed cert via TOFU capture; opt-in `pinned` mode that refuses to start without a verified cert             | `CERT_NONE` on loopback, or TLS handling unspecified |
+| Credential storage       | macOS Keychain, with `/usr/bin/security` on the trusted-applications ACL so prompts stop after first install                         | `.env` file, plaintext in config, or env-var only    |
+| Dependency installation  | `--require-hashes` against a fully resolved `requirements.txt` lock (every transitive sha256 verified at install)                    | `pip install <package>` (floats to latest)           |
+| Connection management    | Pooled IMAP + SMTP sessions per process, asyncio locks, auto-reconnect on drops                                                      | New connection per call (login storms)               |
+| Read semantics           | `mark_seen=false` is the default; reads never implicitly mark messages read                                                          | Often marks read implicitly                          |
+| Threat model             | Documented in the README; explicit prompt-injection caveat for inbound mail content                                                  | Usually absent                                       |
+| Troubleshooting coverage | Real-world gotchas captured: Python 3.12+ naive-datetime crash, IMAP `FETCH` UID-spec quirk, macOS Keychain ACL prompt-loop, stale `__pycache__` after Python-version bump | Generic, or absent                                   |
+
+**When this is not the right pick.** If you want the largest possible Proton tool surface (Mail + Pass + Drive + Calendar + VPN), look at [`jorgenclaw/proton-mcp`](https://github.com/jorgenclaw/proton-mcp). If you specifically want a local SQLite + FTS5 search index over your Bridge mail, look at [`dreamc0der-ai/proton-mail-mcp`](https://github.com/dreamc0der-ai/proton-mail-mcp). If you want a hardened, audit-friendly, Mail-only Bridge MCP with hash-pinned dependencies and an opinionated security posture, you're in the right place.
+
 ## Tool surface
 
 | Tool                         | Purpose                                                  | Annotations     |
