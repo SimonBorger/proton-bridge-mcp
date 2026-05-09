@@ -13,7 +13,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - `.claude-plugin/marketplace.json` — self-hosted marketplace endpoint. Users can `/plugin marketplace add miketigerblue/proton-bridge-mcp` and install directly from the repo.
 - `.mcp.json` — generic project-local stdio launch descriptor for `claude mcp add` and other MCP-capable clients that follow the convention.
 - `server.json` — submission template for the official MCP Registry at `registry.modelcontextprotocol.io`. Reverse-DNS name `io.github.miketigerblue/proton-bridge-mcp`. The `packages.identifier` field assumes a PyPI artifact named `proton-bridge-mcp`; that must be published before this `server.json` can be submitted.
-- `HANDOFF.md` — phase plan, conventions, and gotchas captured for any future contributor (or Code agent) picking up the project.
 - README "Why this one?" section positioning the server against the existing Proton-MCP ecosystem on security and supply-chain hygiene rather than tool count.
 - `SECURITY.md` — vulnerability reporting policy (GitHub Security Advisories), supported-versions table, threat model summary covering loopback isolation, credential confidentiality, supply-chain integrity, TLS pinning, and out-of-scope items including prompt-injection from inbound mail.
 - `assets/icon.svg` and `assets/icon.png` (256×256) — placeholder icon for marketplace and registry listings. SVG kept as the source so the PNG can be re-rendered with `qlmanage -t -s 256 -o assets/ assets/icon.svg`.
