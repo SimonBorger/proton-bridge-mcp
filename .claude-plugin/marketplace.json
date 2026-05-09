@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "miketigerblue",
+  "version": "1.0.0",
+  "description": "Hardened, security-focused MCP servers and plugins by Mike Harris.",
+  "owner": {
+    "name": "Mike Harris",
+    "email": "mike@tigerblue.io",
+    "url": "https://github.com/miketigerblue"
+  },
+  "homepage": "https://github.com/miketigerblue/proton-bridge-mcp",
+  "license": "MIT",
+  "plugins": [
+    {
+      "name": "proton-bridge-mcp",
+      "description": "Hardened local MCP server for Proton Mail via Bridge — Keychain creds, TLS pinning, hash-pinned deps.",
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/miketigerblue/proton-bridge-mcp",
+      "license": "MIT",
+      "keywords": ["mcp", "proton-mail", "email", "imap", "smtp"]
+    }
+  ]
+}

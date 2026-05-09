@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "proton-bridge-mcp",
+  "version": "0.1.0",
+  "description": "Hardened local MCP server exposing Proton Mail Bridge to Claude Desktop and Claude Code over loopback IMAP/SMTP. macOS Keychain credentials, TLS pinning, hash-pinned dependencies.",
+  "author": {
+    "name": "Mike Harris",
+    "email": "mike@tigerblue.io",
+    "url": "https://github.com/miketigerblue"
+  },
+  "homepage": "https://github.com/miketigerblue/proton-bridge-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/miketigerblue/proton-bridge-mcp.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "proton",
+    "proton-mail",
+    "email",
+    "imap",
+    "smtp",
+    "macos",
+    "keychain",
+    "tls-pinning"
+  ],
+  "mcpServers": {
+    "proton_bridge": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/.venv/bin/python",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/proton_bridge_mcp.py"
+      ],
+      "env": {
+        "PROTON_BRIDGE_USER": "${PROTON_BRIDGE_USER}",
+        "PROTON_BRIDGE_HOST": "127.0.0.1",
+        "PROTON_BRIDGE_IMAP_PORT": "1143",
+        "PROTON_BRIDGE_SMTP_PORT": "1025",
+        "PROTON_BRIDGE_TLS_POLICY": "best_effort",
+        "PROTON_BRIDGE_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

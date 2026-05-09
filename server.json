@@ -1,0 +1,49 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.miketigerblue/proton-bridge-mcp",
+  "description": "Hardened local MCP server exposing Proton Mail Bridge to Claude over loopback IMAP/SMTP. macOS Keychain credentials, TLS pinning, hash-pinned dependencies.",
+  "repository": {
+    "url": "https://github.com/miketigerblue/proton-bridge-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registry_type": "pypi",
+      "identifier": "proton-bridge-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtime_hint": "uvx",
+      "package_arguments": [],
+      "environment_variables": [
+        {
+          "name": "PROTON_BRIDGE_USER",
+          "description": "Bridge username (usually your Proton email).",
+          "is_required": true,
+          "is_secret": false
+        },
+        {
+          "name": "PROTON_BRIDGE_TLS_POLICY",
+          "description": "best_effort | pinned. Set to 'pinned' to refuse to start without a verified Bridge certificate.",
+          "default": "best_effort",
+          "is_required": false,
+          "is_secret": false
+        },
+        {
+          "name": "PROTON_BRIDGE_CERT_PATH",
+          "description": "Path to the Bridge TLS cert (captured by bootstrap.py at ~/.config/proton-bridge-mcp/cert.pem).",
+          "is_required": false,
+          "is_secret": false
+        },
+        {
+          "name": "PROTON_BRIDGE_PASS",
+          "description": "Bridge app-password fallback for headless / CI use. Prefer macOS Keychain (set automatically by bootstrap.py).",
+          "is_required": false,
+          "is_secret": true
+        }
+      ]
+    }
+  ]
+}

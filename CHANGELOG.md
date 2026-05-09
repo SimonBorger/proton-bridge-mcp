@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+- `.claude-plugin/plugin.json` — Claude plugin manifest. Wraps the server with the metadata Claude Desktop and Claude Code expect when installing from a marketplace. Uses `${CLAUDE_PLUGIN_ROOT}` for portable `.venv` resolution.
+- `.claude-plugin/marketplace.json` — self-hosted marketplace endpoint. Users can `/plugin marketplace add miketigerblue/proton-bridge-mcp` and install directly from the repo.
+- `.mcp.json` — generic project-local stdio launch descriptor for `claude mcp add` and other MCP-capable clients that follow the convention.
+- `server.json` — submission template for the official MCP Registry at `registry.modelcontextprotocol.io`. Reverse-DNS name `io.github.miketigerblue/proton-bridge-mcp`. The `packages.identifier` field assumes a PyPI artifact named `proton-bridge-mcp`; that must be published before this `server.json` can be submitted.
+- `HANDOFF.md` — phase plan, conventions, and gotchas captured for any future contributor (or Code agent) picking up the project.
+- README "Why this one?" section positioning the server against the existing Proton-MCP ecosystem on security and supply-chain hygiene rather than tool count.
+
 ### Fixed
 - `proton_search_emails` and `proton_list_recent` now correctly return IMAP UIDs in their JSON output. The IMAP `FETCH` data-item list was missing the explicit `UID` token, which silently dropped UIDs from server responses on most Bridge versions; downstream tools that take a UID parameter (`proton_read_email`, `proton_flag_email`, `proton_move_email`, etc.) were therefore unusable against fresh search results.
 - `proton_create_draft` and `proton_send_email` (with `save_to_sent=true`) no longer crash on Python 3.12+ runtimes. Both paths called `imaplib.Time2Internaldate(datetime.now())` with a naive datetime, which Python 3.12 began rejecting and Python 3.14 hard-rejects with `ValueError: date_time must be aware`. Both call sites now pass a timezone-aware UTC datetime.
