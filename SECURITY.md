@@ -67,6 +67,24 @@ What this server protects against and what it doesn't.
   `proton_move_email`, `proton_flag_email`, and `proton_create_draft` all
   carry MCP `destructiveHint` / `idempotentHint` annotations the client can
   use to gate confirmation.
+- **Prompt-injection hardening at the read boundary** (partial — see also
+  the out-of-scope section below). Two layered mitigations apply to email
+  content returned to the LLM:
+  - **Steganographic Unicode is stripped.** Zero-width characters
+    (U+200B / U+200C / U+200D / U+FEFF / U+2060–U+2064), bidi-override
+    controls (U+202A–U+202E, U+2066–U+2069), soft hyphen, and Unicode
+    line / paragraph separators are removed from every header value
+    (via `_decode_header`) and from email bodies (via `_extract_body`).
+    These carry payloads invisible to a human reader of the same email
+    but visible to a model.
+  - **Bodies are wrapped in nonce-tagged provenance delimiters.**
+    `proton_read_email` returns body text and (optional) HTML wrapped in
+    `<UNTRUSTED_EMAIL_BODY_<6-hex-nonce> source="…" subject="…">…
+    </UNTRUSTED_EMAIL_BODY_<same-nonce>>` with a one-line preamble
+    instructing the model to treat the wrapped content as data rather
+    than instructions. The per-call nonce prevents an attacker who
+    controls the body from forging a closing tag and convincing the
+    model that the trusted scope has resumed.
 
 ### Out of scope (intentionally not protected)
 
@@ -77,12 +95,17 @@ What this server protects against and what it doesn't.
 - **Compromise of Proton Mail Bridge itself.** This server treats Bridge as
   trusted. If Bridge is compromised, Bridge's own threat model applies, not
   ours.
-- **Prompt injection from inbound mail content.** This is a real risk and
-  cannot be mitigated by the server alone. Email bodies are untrusted input.
-  Any feature that lets the model take action based on email content
-  (auto-reply, auto-forward, rule-based delete) **must** require explicit
-  per-action user confirmation in the MCP client. The server provides the
-  primitives; the client and the operator provide the policy.
+- **Prompt injection from inbound mail content (full prevention).** A real
+  risk that cannot be fully eliminated at the server layer alone. We mitigate
+  at the read boundary (steganographic-Unicode stripping and provenance
+  wrapping — see "In scope" above) but a sufficiently sophisticated injection
+  that survives those defences and convinces the model to call a destructive
+  tool with plausible arguments is the *operator's* and *client's* problem,
+  not ours. Any feature that lets the model take action based on email
+  content (auto-reply, auto-forward, rule-based delete) **must** require
+  explicit per-action user confirmation in the MCP client. The server
+  provides the primitives and the layered defences; the client and the
+  operator provide the policy.
 - **Attacks against Proton's infrastructure or end-to-end-encryption design.**
   Out of this repo's hands.
 - **Non-macOS platforms.** Linux and Windows are unsupported. Bridge runs
@@ -106,6 +129,17 @@ source:
   Running the server without a verified Bridge cert therefore fails closed.
   Setting `PROTON_BRIDGE_TLS_POLICY=best_effort` is the only path that allows
   `CERT_NONE` fallback on loopback.
+- The `_strip_invisibles` regex in `proton_bridge_mcp.py` covers, at minimum,
+  the zero-width and bidi character ranges enumerated above, and is invoked
+  from `_decode_header` and `_extract_body` so every header and body value
+  flowing back to the LLM is sanitised. The unit tests in
+  `tests/test_helpers.py` (classes `TestStripInvisibles` and
+  `TestSanitisationIntegration`) make the coverage explicit.
+- `proton_read_email` wraps `body_text` and `body_html` (when included) with
+  `_wrap_untrusted` before returning. The opening tag uses a
+  `secrets.token_hex(3)` nonce; the closing tag uses the same nonce. Both
+  characteristics are asserted by `TestWrapUntrusted` in
+  `tests/test_helpers.py`.
 - No credential, cert path, or message body is logged at `INFO` or `DEBUG`.
 
 If any of these is no longer true, that itself is a security bug — please
