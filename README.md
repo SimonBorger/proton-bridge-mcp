@@ -75,7 +75,7 @@ cd <install-path>/proton-bridge-mcp
 
 Then **fully quit Claude Desktop (⌘Q) and relaunch**.
 
-### B. Manual three-step install
+### B. Manual four-step install
 
 ```bash
 cd <install-path>/proton-bridge-mcp
@@ -87,9 +87,15 @@ cd <install-path>/proton-bridge-mcp
 ./setup_keychain.sh you@example.com
 # (prompts for the password — paste it; nothing is echoed)
 
-# 3. Merge the entry from claude_desktop_config.example.json into
-#    ~/Library/Application Support/Claude/claude_desktop_config.json
-#    (no password goes in this file — the Keychain handles that).
+# 3. Capture Bridge's TLS certificate (required: pinned mode is the default
+#    and the server fails closed if the cert isn't found and verified).
+#    Writes ~/.config/proton-bridge-mcp/cert.pem with 0600 perms.
+.venv/bin/python proton_bridge_mcp.py --learn-cert
+
+# 4. Merge the entry from claude_desktop_config.example.json into
+#    ~/Library/Application Support/Claude/claude_desktop_config.json,
+#    replacing the <INSTALL_PATH> and <YOU> placeholders. No password
+#    goes in this file — the Keychain handles that.
 ```
 
 Then quit and relaunch Claude Desktop.

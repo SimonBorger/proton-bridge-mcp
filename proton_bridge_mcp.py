@@ -30,7 +30,8 @@ Environment variables
     PROTON_BRIDGE_IMAP_PORT     default 1143
     PROTON_BRIDGE_SMTP_PORT     default 1025
     PROTON_BRIDGE_CERT_PATH     optional explicit path to Bridge cert.pem
-    PROTON_BRIDGE_TLS_POLICY    "pinned" (strict) | "best_effort" (default)
+    PROTON_BRIDGE_TLS_POLICY    "pinned" (default; refuses to start without a verified Bridge cert)
+                                | "best_effort" (explicit downgrade; allows CERT_NONE on loopback)
     PROTON_BRIDGE_DEFAULT_FROM  optional default From address
     PROTON_BRIDGE_KEYCHAIN_SVC  default "proton_bridge_mcp"
 """
