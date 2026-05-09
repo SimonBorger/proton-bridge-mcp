@@ -1,16 +1,20 @@
-# Lightweight smoke-test workflow.
+# Lightweight smoke-test + unit-test workflow.
 #
-# Three jobs, deliberately tight:
+# Four jobs, deliberately tight:
 #   - syntax    : compileall the two Python modules across the supported floor
 #                 (3.10) and the latest tested ceiling (3.14).
 #   - manifests : parse all four JSON manifests and check the load-bearing
 #                 top-level keys are present.
 #   - lockfile  : create a clean venv and run `pip install --require-hashes`
-#                 to confirm the lockfile resolves and hashes match.
+#                 against the user-facing requirements.txt, to confirm the
+#                 runtime lockfile resolves and hashes match.
+#   - tests     : install requirements-dev.txt (a superset of the runtime
+#                 lockfile, also hash-pinned) and run the pytest suite over
+#                 the pure helpers in proton_bridge_mcp.py.
 #
-# This is an integrity smoke test, not a unit-test suite. The goal is to
-# catch lockfile drift, manifest typos, and syntax errors on every push, not
-# to exercise the IMAP/SMTP code paths (which need a running Bridge).
+# The pytest suite covers only side-effect-free helpers (header decoding,
+# address parsing, body extraction, IMAP-search criteria construction). It
+# does not exercise IMAP/SMTP/Keychain paths, which need a running Bridge.
 #
 # TODO (supply-chain hardening): pin third-party actions to commit SHAs once
 # the next set of action releases is reviewed. Major-version tags below are
@@ -108,3 +112,23 @@ jobs:
           .venv/bin/pip install --require-hashes --quiet -r requirements.txt
       - name: Import the runtime deps the server needs
         run: .venv/bin/python -c "import mcp.server.fastmcp, pydantic; print('imports ok')"
+
+  tests:
+    name: Pytest (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Create venv and install dev lockfile with --require-hashes
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade --quiet pip
+          .venv/bin/pip install --require-hashes --quiet -r requirements-dev.txt
+      - name: Run pytest
+        run: .venv/bin/python -m pytest tests/ -v

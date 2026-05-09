@@ -1,0 +1,14 @@
+# Development / CI tooling for proton-bridge-mcp.
+#
+# To regenerate the hash-pinned lockfile (requirements-dev.txt), pass BOTH
+# the runtime spec and this file to uv so the dev lockfile is a complete
+# resolution including the runtime deps:
+#
+#     uv pip compile requirements.in requirements-dev.in \
+#         --generate-hashes --python-version 3.10 \
+#         -o requirements-dev.txt
+#
+# CI installs `requirements-dev.txt` for the test job; end-users continue to
+# install `requirements.txt`.
+
+pytest>=7,<9

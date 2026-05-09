@@ -153,13 +153,28 @@ All configuration is done via the `env` block in `claude_desktop_config.json`. S
 ## Development
 
 ```bash
-# Re-generate hash-pinned requirements after changing top-level deps in requirements.in
+# Re-generate the runtime hash-pinned lockfile after editing requirements.in
 uv pip compile requirements.in --generate-hashes --python-version 3.10 -o requirements.txt
 # (or: pip-compile --generate-hashes --output-file requirements.txt requirements.in)
 
-# Run a quick syntax check
-python3 -c "import ast; ast.parse(open('proton_bridge_mcp.py').read())"
+# Re-generate the dev lockfile (a superset including pytest + transitives).
+# Always pass BOTH .in files so the dev lockfile is a complete resolution
+# consistent with the runtime lockfile.
+uv pip compile requirements.in requirements-dev.in --generate-hashes \
+    --python-version 3.10 -o requirements-dev.txt
+
+# Quick syntax check on the two top-level Python files
+python3 -m compileall -q proton_bridge_mcp.py bootstrap.py
+
+# Install dev deps (hash-pinned) and run the pytest suite
+.venv/bin/pip install --require-hashes -r requirements-dev.txt
+.venv/bin/python -m pytest tests/ -v
 ```
+
+The pytest suite covers the side-effect-free helpers (header decoding,
+address parsing, body extraction, IMAP-search criteria construction). IMAP,
+SMTP and Keychain paths are intentionally not unit-tested — they need a
+running Bridge and integration coverage.
 
 ## License
 
