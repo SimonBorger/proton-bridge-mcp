@@ -66,7 +66,19 @@ What this server protects against and what it doesn't.
 - **Mutating tools are annotated.** `proton_send_email`, `proton_delete_email`,
   `proton_move_email`, `proton_flag_email`, and `proton_create_draft` all
   carry MCP `destructiveHint` / `idempotentHint` annotations the client can
-  use to gate confirmation.
+  use to gate confirmation. `proton_send_email` and `proton_delete_email`
+  carry `destructiveHint: true`.
+- **Server-side `acknowledged` requirement on the irreversible tools.**
+  `proton_send_email` and `proton_delete_email` require an explicit
+  `acknowledged=true` argument. Pydantic input validation rejects calls
+  that omit the field. The tool body returns a structured `refused` JSON
+  payload (with `reason: "acknowledged_required"`) when the field is
+  present but `false`. The aim is to make it impossible to trigger these
+  tools by passive coercion: a prompt-injection payload that simply names
+  the tool and its arguments is rejected before any side effect runs;
+  the model has to *deliberately* set `acknowledged=true`, which is the
+  point at which a well-instructed model surfaces the action to the
+  operator instead.
 - **Prompt-injection hardening at the read boundary** (partial — see also
   the out-of-scope section below). Two layered mitigations apply to email
   content returned to the LLM:
@@ -140,6 +152,12 @@ source:
   `secrets.token_hex(3)` nonce; the closing tag uses the same nonce. Both
   characteristics are asserted by `TestWrapUntrusted` in
   `tests/test_helpers.py`.
+- `SendEmailInput` and `DeleteInput` declare `acknowledged: bool = Field(...)`
+  with no default — pydantic rejects calls that omit the field. The tool
+  bodies of `proton_send_email` and `proton_delete_email` short-circuit on
+  `acknowledged=False` and return `_refused_unack(...)`. Both behaviours are
+  pinned by `TestSendEmailInputRequiresAck`, `TestDeleteInputRequiresAck`,
+  and `TestRefusedUnack` in `tests/test_helpers.py`.
 - No credential, cert path, or message body is logged at `INFO` or `DEBUG`.
 
 If any of these is no longer true, that itself is a security bug — please

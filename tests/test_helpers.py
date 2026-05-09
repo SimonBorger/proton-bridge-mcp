@@ -9,8 +9,12 @@ or simulated Bridge.
 from __future__ import annotations
 
 import email
+import json
 import re
 from email.message import EmailMessage
+
+import pytest
+from pydantic import ValidationError
 
 import proton_bridge_mcp as pbm
 
@@ -415,6 +419,70 @@ class TestSanitisationIntegration:
         # cleaned up.
         out = pbm._addr_struct("Pa​yPal <attacker@evil.com>")
         assert out == [{"name": "PayPal", "email": "attacker@evil.com"}]
+
+
+# ----------------------------------------------------------------------------
+# Destructive-tool acknowledgement gating
+# ----------------------------------------------------------------------------
+class TestSendEmailInputRequiresAck:
+    """`acknowledged` is a server-enforced anti-coercion check on send."""
+
+    def test_omitting_acknowledged_raises(self):
+        with pytest.raises(ValidationError):
+            pbm.SendEmailInput(
+                to=["a@b.com"], subject="hi", body_text="hello",
+            )
+
+    def test_acknowledged_true_validates(self):
+        m = pbm.SendEmailInput(
+            to=["a@b.com"], subject="hi", body_text="hello", acknowledged=True,
+        )
+        assert m.acknowledged is True
+
+    def test_acknowledged_false_validates_at_input_layer(self):
+        # The bool itself is structurally valid; refusal happens in the
+        # tool body (verified separately by TestRefusedUnack).
+        m = pbm.SendEmailInput(
+            to=["a@b.com"], subject="hi", body_text="hello", acknowledged=False,
+        )
+        assert m.acknowledged is False
+
+
+class TestDeleteInputRequiresAck:
+    """`acknowledged` is a server-enforced anti-coercion check on delete."""
+
+    def test_omitting_acknowledged_raises(self):
+        with pytest.raises(ValidationError):
+            pbm.DeleteInput(uid="42")
+
+    def test_omitting_acknowledged_raises_even_with_expunge(self):
+        # The expunge flag does not satisfy the requirement; explicit
+        # acknowledged=true is still required for a permanent delete.
+        with pytest.raises(ValidationError):
+            pbm.DeleteInput(uid="42", expunge=True)
+
+    def test_acknowledged_true_validates(self):
+        m = pbm.DeleteInput(uid="42", acknowledged=True)
+        assert m.acknowledged is True
+
+    def test_acknowledged_false_validates_at_input_layer(self):
+        m = pbm.DeleteInput(uid="42", acknowledged=False)
+        assert m.acknowledged is False
+
+
+class TestRefusedUnack:
+    def test_refusal_shape_for_send(self):
+        data = json.loads(pbm._refused_unack("proton_send_email"))
+        assert data["status"] == "refused"
+        assert data["reason"] == "acknowledged_required"
+        assert data["action"] == "proton_send_email"
+        assert "acknowledged" in data["message"].lower()
+        assert "prompt injection" in data["message"].lower()
+
+    def test_refusal_shape_for_delete(self):
+        data = json.loads(pbm._refused_unack("proton_delete_email"))
+        assert data["action"] == "proton_delete_email"
+        assert data["status"] == "refused"
 
 
 # ----------------------------------------------------------------------------
