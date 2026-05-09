@@ -1,0 +1,28 @@
+# Dependabot configuration.
+#
+# Scope: GitHub Actions only. The workflow in .github/workflows/ci.yml pins
+# third-party actions to commit SHAs as a supply-chain hardening measure;
+# Dependabot keeps those pins fresh by opening a PR when a new release is
+# tagged. Review each PR's diff against the upstream release before merging
+# -- a SHA bump rolls in everything between the old and new commit.
+#
+# Pip is intentionally NOT enabled here. The hash-pinned `requirements.txt`
+# and `requirements-dev.txt` files are generated from `requirements.in` and
+# `requirements-dev.in` via `uv pip compile --generate-hashes`. Dependabot's
+# pip integration would edit the lockfiles directly without re-running the
+# resolver, breaking the .in -> .txt pipeline. Updates flow through the
+# manual regen step documented in the README's Development section.
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci"
+    open-pull-requests-limit: 5
+    labels:
+      - "supply-chain"
+      - "dependencies"

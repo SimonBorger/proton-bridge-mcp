@@ -16,10 +16,13 @@
 # address parsing, body extraction, IMAP-search criteria construction). It
 # does not exercise IMAP/SMTP/Keychain paths, which need a running Bridge.
 #
-# TODO (supply-chain hardening): pin third-party actions to commit SHAs once
-# the next set of action releases is reviewed. Major-version tags below are
-# the GitHub-recommended starting point but allow re-tagging by the action
-# author; SHA pinning eliminates that.
+# Third-party actions are pinned to commit SHAs (not tags) so an action
+# author cannot silently re-tag a release with new code -- a real
+# supply-chain risk. The trailing comment after each `@<sha>` records the
+# release tag the SHA corresponds to, for human readability. Dependabot
+# (.github/dependabot.yml) opens weekly PRs to bump these pins; review the
+# diff before merging. Both pinned versions run on Node.js 24, so this
+# workflow does not surface the GitHub deprecation banner for Node 20.
 
 name: CI
 
@@ -41,8 +44,8 @@ jobs:
       matrix:
         python-version: ["3.10", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile sources
@@ -52,8 +55,8 @@ jobs:
     name: Manifest JSON
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: "3.12"
       - name: Parse and structural-check manifests
@@ -101,8 +104,8 @@ jobs:
       matrix:
         python-version: ["3.10", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Create venv and install with --require-hashes
@@ -121,8 +124,8 @@ jobs:
       matrix:
         python-version: ["3.10", "3.14"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Create venv and install dev lockfile with --require-hashes
