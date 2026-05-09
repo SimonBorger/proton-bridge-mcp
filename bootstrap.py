@@ -163,9 +163,13 @@ def ensure_keychain(user: str, force: bool = False) -> str:
     pw = re.sub(r"\s+", "", raw)
     if not pw:
         die("empty password")
+    # -T /usr/bin/security puts the security CLI on the keychain item's
+    # trusted-applications ACL. Without it, macOS prompts on every MCP process
+    # spawn and "Always Allow" does not persist across restarts. The Python
+    # MCP shells out to /usr/bin/security at runtime to fetch the password.
     subprocess.run(
         ["/usr/bin/security", "add-generic-password", "-U",
-         "-s", KC_SERVICE, "-a", user, "-w", pw],
+         "-s", KC_SERVICE, "-a", user, "-T", "/usr/bin/security", "-w", pw],
         check=True,
     )
     ok(f"stored ({len(pw)} chars)")
