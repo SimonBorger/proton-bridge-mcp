@@ -55,10 +55,12 @@ What this server protects against and what it doesn't.
   every transitive dependency is verified against a known-good sha256 at
   install. Tampered wheels on PyPI fail loudly. `bootstrap.py` and
   `install.sh` both pass `--require-hashes`.
-- **TLS to Bridge.** STARTTLS is always negotiated. With
-  `PROTON_BRIDGE_TLS_POLICY=pinned`, the connection refuses to start unless
-  Bridge presents the cert captured during first-run TOFU. With `best_effort`
-  (default), the server falls back to `CERT_NONE` on loopback only.
+- **TLS to Bridge.** STARTTLS is always negotiated. The default policy is
+  `pinned`: the connection refuses to start unless Bridge presents the cert
+  captured during first-run TOFU. Setting `PROTON_BRIDGE_TLS_POLICY=best_effort`
+  is an explicit downgrade that allows fallback to `CERT_NONE` on loopback
+  only — useful for first-install diagnostics, not the recommended long-term
+  posture.
 - **Read semantics.** `proton_read_email` defaults `mark_seen=false`. Reading
   a message never implicitly marks it seen.
 - **Mutating tools are annotated.** `proton_send_email`, `proton_delete_email`,
@@ -99,8 +101,11 @@ source:
   with `-T /usr/bin/security`.)
 - The MCP server fetches the password by invoking `/usr/bin/security` per
   process; the password is not cached on disk.
-- `PROTON_BRIDGE_TLS_POLICY=pinned` causes the server to refuse to start when
-  the captured cert can't be loaded.
+- The source defaults `PROTON_BRIDGE_TLS_POLICY` to `pinned` (see
+  `proton_bridge_mcp.py`), and the supplied manifests do not override it.
+  Running the server without a verified Bridge cert therefore fails closed.
+  Setting `PROTON_BRIDGE_TLS_POLICY=best_effort` is the only path that allows
+  `CERT_NONE` fallback on loopback.
 - No credential, cert path, or message body is logged at `INFO` or `DEBUG`.
 
 If any of these is no longer true, that itself is a security bug — please
@@ -108,9 +113,10 @@ report it via the channel above.
 
 ## Hardening recommendations for operators
 
-- Run with `PROTON_BRIDGE_TLS_POLICY=pinned` once `bootstrap.py` has captured
-  Bridge's cert. The `best_effort` default exists for first-install
-  ergonomics, not as the long-term posture.
+- Stay on the default `PROTON_BRIDGE_TLS_POLICY=pinned`. `best_effort` exists
+  as an explicit downgrade for first-install diagnostics — not as a
+  long-term posture. If you've set it during troubleshooting, drop it from
+  the env once `bootstrap.py` has captured Bridge's cert.
 - Keep Bridge up to date. Bridge regenerates its TLS cert on some upgrades; in
   pinned mode, that means re-running `bootstrap.py` (the cert capture step).
 - Review the MCP client's destructive-action confirmation policy. Never let

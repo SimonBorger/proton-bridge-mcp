@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 ### Security
 - Tightened `.gitignore` to refuse credentials, TLS material (`*.pem`/`*.crt`/`*.key`/`cert.pem`), live Claude Desktop config, and dotenv files. The `*.example.json` files are still tracked.
 - Added `SECURITY.md` formalising the disclosure channel and the threat model. Operators are explicitly warned that prompt injection from inbound mail content is out of scope for the server alone — destructive actions taken on the basis of email content must be gated by per-action confirmation in the MCP client.
+- Aligned all documentation and shipped manifests with the source-level secure-by-default TLS posture. `proton_bridge_mcp.py` defaults `PROTON_BRIDGE_TLS_POLICY` to `pinned`; the README configuration table, the README threat-model and hardening sections, the comparison table, the troubleshooting entry for missing certs, `SECURITY.md`, `.claude-plugin/plugin.json`, `.mcp.json`, and `server.json` previously documented or injected `best_effort` as the default. They now all reflect that `pinned` is the default and `best_effort` is an explicit downgrade for first-install diagnostics. No code change — this is a documentation-and-manifest fix.
 
 ## [0.1.0] - 2026-04-24
 

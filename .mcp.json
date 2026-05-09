@@ -8,7 +8,7 @@
         "PROTON_BRIDGE_HOST": "127.0.0.1",
         "PROTON_BRIDGE_IMAP_PORT": "1143",
         "PROTON_BRIDGE_SMTP_PORT": "1025",
-        "PROTON_BRIDGE_TLS_POLICY": "best_effort",
+        "PROTON_BRIDGE_TLS_POLICY": "pinned",
         "PROTON_BRIDGE_LOG_LEVEL": "INFO"
       }
     }

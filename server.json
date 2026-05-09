@@ -26,8 +26,8 @@
         },
         {
           "name": "PROTON_BRIDGE_TLS_POLICY",
-          "description": "best_effort | pinned. Set to 'pinned' to refuse to start without a verified Bridge certificate.",
-          "default": "best_effort",
+          "description": "pinned | best_effort. Defaults to 'pinned' — the server refuses to start unless Bridge's TLS certificate is found and verified. Set to 'best_effort' only as an explicit downgrade for first-install diagnostics; it allows fallback to CERT_NONE on loopback.",
+          "default": "pinned",
           "is_required": false,
           "is_secret": false
         },
