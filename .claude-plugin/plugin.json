@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "proton-bridge-mcp",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Hardened local MCP server exposing Proton Mail Bridge to Claude Desktop and Claude Code over loopback IMAP/SMTP. macOS Keychain credentials, TLS pinning, hash-pinned dependencies.",
   "author": {
     "name": "Mike Harris",

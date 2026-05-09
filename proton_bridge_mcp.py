@@ -178,7 +178,8 @@ def _ssl_context() -> ssl.SSLContext:
         tried = "\n  ".join(str(p) for p in BRIDGE_CERT_CANDIDATES)
         raise RuntimeError(
             "TLS is set to 'pinned' but the Bridge certificate could not be found.\n"
-            "Run '--find-cert' to search: python proton_bridge_mcp.py --find-cert\n"
+            "Run --find-cert to search: proton-bridge-mcp --find-cert\n"
+            "(or `python proton_bridge_mcp.py --find-cert` from a repo clone)\n"
             "Fix it by either:\n"
             "  (a) setting PROTON_BRIDGE_CERT_PATH=/absolute/path/to/cert.pem, or\n"
             "  (b) setting PROTON_BRIDGE_TLS_POLICY=best_effort (localhost only).\n"
@@ -214,9 +215,10 @@ def _find_cert_diagnostic() -> int:
         return 0
     print(
         "\nNo Bridge certificate located.\n"
-        "Bridge v3 stores its TLS cert internally, not as a file. Run:\n"
-        "  python proton_bridge_mcp.py --learn-cert\n"
-        "to capture the cert via STARTTLS (trust-on-first-use) and pin against it."
+        "Bridge v3 stores its TLS cert internally, not as a file. Capture it\n"
+        "via STARTTLS (trust-on-first-use) and pin against it:\n"
+        "  proton-bridge-mcp --learn-cert    # installed via pip / uvx\n"
+        "  python proton_bridge_mcp.py --learn-cert    # running from a repo clone"
     )
     return 1
 
@@ -1245,12 +1247,27 @@ def _render_headers_md(mailbox: str, total: int, headers: List[Dict[str, Any]],
 # --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
-if __name__ == "__main__":
+__version__ = "0.3.0"
+
+
+def main() -> None:
+    """Console-script entry point.
+
+    Exposed as `proton-bridge-mcp` via `pyproject.toml`'s
+    `[project.scripts]` block, and called directly when the module is
+    invoked with `python proton_bridge_mcp.py`. Dispatches the CLI flags
+    that don't start an MCP server (cert diagnostics, version), then
+    falls through to `mcp.run()` for stdio MCP service.
+    """
     if "--find-cert" in sys.argv:
         sys.exit(_find_cert_diagnostic())
     if "--learn-cert" in sys.argv:
         sys.exit(_learn_cert(sys.argv))
     if "--version" in sys.argv:
-        print("proton_bridge_mcp 0.2.0")
+        print(f"proton-bridge-mcp {__version__}")
         sys.exit(0)
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()

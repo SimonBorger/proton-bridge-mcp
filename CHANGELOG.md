@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-09
+
 ### Added
 - `.claude-plugin/plugin.json` — Claude plugin manifest. Wraps the server with the metadata Claude Desktop and Claude Code expect when installing from a marketplace. Uses `${CLAUDE_PLUGIN_ROOT}` for portable `.venv` resolution.
 - `.claude-plugin/marketplace.json` — self-hosted marketplace endpoint. Users can `/plugin marketplace add miketigerblue/proton-bridge-mcp` and install directly from the repo.
@@ -20,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - `tests/test_helpers.py` — pytest suite covering the side-effect-free helpers in `proton_bridge_mcp.py`: `_decode_header` (None / bytes / RFC 2047 quoted-printable and base64), `_iso_date` (None / malformed / RFC 2822), `_quote` (IMAP string quoting with backslash and double-quote escaping), `_addr_struct` (bare addresses, display names, RFC 2047 in display names, multiple recipients), `_parse_flags` (FLAGS extraction), `_extract_body` (plain / HTML / multipart / attachment-payload-must-not-leak-into-body / `MAX_BODY_CHARS` truncation), `_build_search` (empty → ALL, single and combined filters, ISO-date-to-IMAP-date conversion with and without trailing Z, NOT KEYWORD), and `_locate_bridge_cert` (override-takes-precedence and override-missing-does-not-fall-through). 43 tests, ~0.6s.
 - `requirements-dev.in` and `requirements-dev.txt` — hash-pinned dev lockfile generated from both `requirements.in` and `requirements-dev.in` together, so the dev environment is a consistent superset of the runtime environment. CI's pytest job installs this lockfile with `pip install --require-hashes`.
 - `conftest.py` (top level, deliberately empty) — anchors pytest's rootdir at the repo root so tests can import the top-level `proton_bridge_mcp.py` without packaging.
+- `pyproject.toml` (PEP 621) — packaging metadata for the PyPI distribution and the official MCP Registry submission. Declares the runtime dependencies as broad lower bounds (`mcp[cli] >= 1.0`, `pydantic >= 2.0`) so downstream `pip install` / `uvx` users get a working set without inheriting the developer's exact transitive pins; hash-pinned `requirements.txt` continues to govern the development install. Wires up a `proton-bridge-mcp` console-script entry point (`proton_bridge_mcp:main`) so the binary is invocable directly after install instead of needing a file path.
+- `proton_bridge_mcp.main()` — the CLI dispatch previously inlined under `if __name__ == "__main__":` is refactored into a top-level `main()` function so it can be the target of the new console-script entry point. Behaviour unchanged: `--find-cert`, `--learn-cert`, `--version`, otherwise `mcp.run()`. The version string is now read from a module-level `__version__ = "0.3.0"` rather than being a literal in the dispatch block, so future bumps don't drift.
 
 ### Fixed
 - `proton_search_emails` and `proton_list_recent` now correctly return IMAP UIDs in their JSON output. The IMAP `FETCH` data-item list was missing the explicit `UID` token, which silently dropped UIDs from server responses on most Bridge versions; downstream tools that take a UID parameter (`proton_read_email`, `proton_flag_email`, `proton_move_email`, etc.) were therefore unusable against fresh search results.

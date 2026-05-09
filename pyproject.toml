@@ -1,0 +1,89 @@
+# PEP 621 metadata for proton-bridge-mcp.
+#
+# This file is what the PyPI distribution and the official MCP Registry
+# entry are built from. Runtime dependency *resolution* still uses the
+# hash-pinned `requirements.txt` (and `requirements-dev.txt` for
+# development); the version specifiers below are deliberately broad lower
+# bounds rather than pins so that downstream installs via `pip install
+# proton-bridge-mcp` or `uvx proton-bridge-mcp` get a working set without
+# being locked to the exact transitive graph the developer pinned.
+#
+# Single-module layout: the source lives in `proton_bridge_mcp.py` at the
+# repo root, not in a package directory. `[tool.setuptools] py-modules`
+# captures that explicitly.
+
+[build-system]
+requires = ["setuptools >= 68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proton-bridge-mcp"
+dynamic = ["version"]
+description = "Hardened local MCP server exposing Proton Mail Bridge to Claude over loopback IMAP/SMTP. macOS Keychain credentials, TLS pinning, hash-pinned dependencies, prompt-injection hardening on the read path."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Mike Harris", email = "mike@tigerblue.io" },
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "claude-code",
+    "proton",
+    "proton-mail",
+    "email",
+    "imap",
+    "smtp",
+    "macos",
+    "keychain",
+    "tls-pinning",
+    "prompt-injection",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Communications :: Email",
+    "Topic :: Security",
+]
+dependencies = [
+    "mcp[cli] >= 1.0",
+    "pydantic >= 2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/miketigerblue/proton-bridge-mcp"
+Repository = "https://github.com/miketigerblue/proton-bridge-mcp.git"
+Issues = "https://github.com/miketigerblue/proton-bridge-mcp/issues"
+Changelog = "https://github.com/miketigerblue/proton-bridge-mcp/blob/main/CHANGELOG.md"
+"Security advisories" = "https://github.com/miketigerblue/proton-bridge-mcp/security/advisories"
+
+[project.scripts]
+# Console-script entry point: after `pip install proton-bridge-mcp` (or
+# `uvx proton-bridge-mcp`), the binary is callable as `proton-bridge-mcp`.
+# It dispatches `--version`, `--find-cert`, `--learn-cert`, and otherwise
+# starts the MCP server over stdio.
+proton-bridge-mcp = "proton_bridge_mcp:main"
+
+[tool.setuptools]
+py-modules = ["proton_bridge_mcp"]
+
+[tool.setuptools.dynamic]
+# Single source of truth for the version: the module-level
+# `__version__` literal in `proton_bridge_mcp.py`. Bump that when cutting
+# a release; setuptools propagates the value to the wheel metadata, the
+# `--version` flag (which already reads the same attribute), and -- via
+# the registry submission -- to `server.json` (which is updated manually
+# in the same commit).
+version = { attr = "proton_bridge_mcp.__version__" }

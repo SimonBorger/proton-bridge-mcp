@@ -6,12 +6,12 @@
     "url": "https://github.com/miketigerblue/proton-bridge-mcp",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.3.0",
   "packages": [
     {
       "registry_type": "pypi",
       "identifier": "proton-bridge-mcp",
-      "version": "0.1.0",
+      "version": "0.3.0",
       "transport": {
         "type": "stdio"
       },
