@@ -1,0 +1,110 @@
+# Lightweight smoke-test workflow.
+#
+# Three jobs, deliberately tight:
+#   - syntax    : compileall the two Python modules across the supported floor
+#                 (3.10) and the latest tested ceiling (3.14).
+#   - manifests : parse all four JSON manifests and check the load-bearing
+#                 top-level keys are present.
+#   - lockfile  : create a clean venv and run `pip install --require-hashes`
+#                 to confirm the lockfile resolves and hashes match.
+#
+# This is an integrity smoke test, not a unit-test suite. The goal is to
+# catch lockfile drift, manifest typos, and syntax errors on every push, not
+# to exercise the IMAP/SMTP code paths (which need a running Bridge).
+#
+# TODO (supply-chain hardening): pin third-party actions to commit SHAs once
+# the next set of action releases is reviewed. Major-version tags below are
+# the GitHub-recommended starting point but allow re-tagging by the action
+# author; SHA pinning eliminates that.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: Syntax (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile sources
+        run: python -m compileall -q proton_bridge_mcp.py bootstrap.py
+
+  manifests:
+    name: Manifest JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Parse and structural-check manifests
+        run: |
+          python <<'PY'
+          import json, sys
+          from pathlib import Path
+
+          # path -> required top-level keys
+          required = {
+              ".claude-plugin/plugin.json":      ["name", "version", "description", "author", "mcpServers"],
+              ".claude-plugin/marketplace.json": ["name", "owner", "plugins"],
+              ".mcp.json":                       ["mcpServers"],
+              "server.json":                     ["name", "description", "version", "packages"],
+          }
+
+          failed = False
+          for path, keys in required.items():
+              p = Path(path)
+              if not p.is_file():
+                  print(f"MISSING: {path}")
+                  failed = True
+                  continue
+              try:
+                  data = json.loads(p.read_text())
+              except json.JSONDecodeError as e:
+                  print(f"INVALID JSON: {path}: {e}")
+                  failed = True
+                  continue
+              missing = [k for k in keys if k not in data]
+              if missing:
+                  print(f"MISSING KEYS in {path}: {missing}")
+                  failed = True
+              else:
+                  print(f"OK: {path}")
+
+          sys.exit(1 if failed else 0)
+          PY
+
+  lockfile:
+    name: Hash-locked install (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Create venv and install with --require-hashes
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade --quiet pip
+          .venv/bin/pip install --require-hashes --quiet -r requirements.txt
+      - name: Import the runtime deps the server needs
+        run: .venv/bin/python -c "import mcp.server.fastmcp, pydantic; print('imports ok')"

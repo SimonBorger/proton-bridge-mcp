@@ -13,10 +13,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - `server.json` — submission template for the official MCP Registry at `registry.modelcontextprotocol.io`. Reverse-DNS name `io.github.miketigerblue/proton-bridge-mcp`. The `packages.identifier` field assumes a PyPI artifact named `proton-bridge-mcp`; that must be published before this `server.json` can be submitted.
 - `HANDOFF.md` — phase plan, conventions, and gotchas captured for any future contributor (or Code agent) picking up the project.
 - README "Why this one?" section positioning the server against the existing Proton-MCP ecosystem on security and supply-chain hygiene rather than tool count.
+- `SECURITY.md` — vulnerability reporting policy (GitHub Security Advisories), supported-versions table, threat model summary covering loopback isolation, credential confidentiality, supply-chain integrity, TLS pinning, and out-of-scope items including prompt-injection from inbound mail.
+- `assets/icon.svg` and `assets/icon.png` (256×256) — placeholder icon for marketplace and registry listings. SVG kept as the source so the PNG can be re-rendered with `qlmanage -t -s 256 -o assets/ assets/icon.svg`.
+- `.github/workflows/ci.yml` — lightweight smoke-test workflow with three jobs: syntax check on `proton_bridge_mcp.py` and `bootstrap.py` across Python 3.10 and 3.14, structural validation of all four JSON manifests, and a clean-venv install with `pip install --require-hashes -r requirements.txt` to catch lockfile drift on every push and pull request.
 
 ### Fixed
 - `proton_search_emails` and `proton_list_recent` now correctly return IMAP UIDs in their JSON output. The IMAP `FETCH` data-item list was missing the explicit `UID` token, which silently dropped UIDs from server responses on most Bridge versions; downstream tools that take a UID parameter (`proton_read_email`, `proton_flag_email`, `proton_move_email`, etc.) were therefore unusable against fresh search results.
 - `proton_create_draft` and `proton_send_email` (with `save_to_sent=true`) no longer crash on Python 3.12+ runtimes. Both paths called `imaplib.Time2Internaldate(datetime.now())` with a naive datetime, which Python 3.12 began rejecting and Python 3.14 hard-rejects with `ValueError: date_time must be aware`. Both call sites now pass a timezone-aware UTC datetime.
+- `bootstrap.py` now stores the Bridge app-password in the macOS Keychain with `-T /usr/bin/security` on the trusted-applications ACL. The previous omission meant users following the recommended one-shot install path hit the keychain prompt-loop on every MCP process spawn, even though the equivalent fix had already landed in `setup_keychain.sh`.
 
 ### Changed
 - `setup_keychain.sh` now stores the Bridge app-password with `-T /usr/bin/security` instead of `-T ""`. The previous setting registered no trusted apps on the keychain item, which caused macOS to re-prompt on every MCP process spawn and prevented `Always Allow` from persisting. With `/usr/bin/security` on the trusted-applications list the keychain ACL matches the binary the MCP shells out to, and the prompt-loop disappears.
@@ -24,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Security
 - Tightened `.gitignore` to refuse credentials, TLS material (`*.pem`/`*.crt`/`*.key`/`cert.pem`), live Claude Desktop config, and dotenv files. The `*.example.json` files are still tracked.
+- Added `SECURITY.md` formalising the disclosure channel and the threat model. Operators are explicitly warned that prompt injection from inbound mail content is out of scope for the server alone — destructive actions taken on the basis of email content must be gated by per-action confirmation in the MCP client.
 
 ## [0.1.0] - 2026-04-24
 
