@@ -30,12 +30,12 @@ Several other Proton MCP servers exist on GitHub. Most are functional and some h
 | `proton_list_recent`         | N newest messages in a mailbox (headers only)            | read-only       |
 | `proton_search_emails`       | IMAP SEARCH (from / to / subject / body / date / flags)  | read-only       |
 | `proton_read_email`          | Full headers + text + (optional) HTML + attachments list | read-only       |
-| `proton_download_attachment` | Save a specific attachment to disk                       | read-only (I/O) |
+| `proton_download_attachment` | Save a specific attachment to disk                       | destructive (writes to disk; requires `acknowledged=true`) |
 | `proton_flag_email`          | Mark read/unread, flag/unflag                            | mutate          |
 | `proton_move_email`          | Move a message to another mailbox                        | mutate          |
-| `proton_delete_email`        | Move to Trash (or permanently expunge)                   | destructive     |
-| `proton_send_email`          | Send via Bridge SMTP, optional append-to-Sent            | mutate          |
-| `proton_create_draft`        | Save a draft in Drafts for manual review                 | mutate          |
+| `proton_delete_email`        | Move to Trash (or permanently expunge)                   | destructive (requires `acknowledged=true`) |
+| `proton_send_email`          | Send via Bridge SMTP, optional append-to-Sent            | destructive (requires `acknowledged=true`) |
+| `proton_create_draft`        | Save a draft in Drafts for manual review                 | destructive when addressed externally (requires `acknowledged=true` for non-self recipients) |
 
 ## Hardening highlights
 

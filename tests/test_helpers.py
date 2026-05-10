@@ -553,6 +553,123 @@ class TestRefusedUnack:
         assert data["action"] == "proton_delete_email"
         assert data["status"] == "refused"
 
+    def test_refusal_shape_for_create_draft(self):
+        data = json.loads(pbm._refused_unack("proton_create_draft"))
+        assert data["action"] == "proton_create_draft"
+        assert data["status"] == "refused"
+        assert data["reason"] == "acknowledged_required"
+
+    def test_refusal_shape_for_download_attachment(self):
+        data = json.loads(pbm._refused_unack("proton_download_attachment"))
+        assert data["action"] == "proton_download_attachment"
+        assert data["status"] == "refused"
+
+
+class TestCreateDraftInputRequiresAck:
+    """`acknowledged` is required at the input layer so a model has to
+    consciously decide. The body-level external-recipient gate decides
+    whether `acknowledged=False` is actually refused."""
+
+    def test_omitting_acknowledged_raises(self):
+        with pytest.raises(ValidationError):
+            pbm.CreateDraftInput(to=["a@b.com"], subject="hi", body_text="hello")
+
+    def test_acknowledged_true_validates(self):
+        m = pbm.CreateDraftInput(
+            to=["a@b.com"], subject="hi", body_text="hello", acknowledged=True,
+        )
+        assert m.acknowledged is True
+
+    def test_acknowledged_false_validates_at_input_layer(self):
+        # Structurally valid; the tool body decides whether to refuse based
+        # on whether any recipient is external.
+        m = pbm.CreateDraftInput(
+            to=["a@b.com"], subject="hi", body_text="hello", acknowledged=False,
+        )
+        assert m.acknowledged is False
+
+
+class TestDownloadAttachmentInputRequiresAck:
+    """Writing attachment bytes to a user-supplied path is a side effect
+    outside the model's sandbox; the field is required."""
+
+    def test_omitting_acknowledged_raises(self):
+        with pytest.raises(ValidationError):
+            pbm.DownloadAttachmentInput(
+                uid="42", filename="report.pdf", save_path="/tmp/r.pdf",
+            )
+
+    def test_acknowledged_true_validates(self):
+        m = pbm.DownloadAttachmentInput(
+            uid="42", filename="report.pdf", save_path="/tmp/r.pdf",
+            acknowledged=True,
+        )
+        assert m.acknowledged is True
+
+    def test_acknowledged_false_validates_at_input_layer(self):
+        m = pbm.DownloadAttachmentInput(
+            uid="42", filename="report.pdf", save_path="/tmp/r.pdf",
+            acknowledged=False,
+        )
+        assert m.acknowledged is False
+
+
+class TestExternalRecipients:
+    """Self-address detection for the draft-recipient gate."""
+
+    def test_no_self_addresses_treats_all_as_external(self, monkeypatch):
+        monkeypatch.setattr(pbm, "BRIDGE_USER", "")
+        monkeypatch.setattr(pbm, "DEFAULT_FROM", "")
+        out = pbm._external_recipients(["a@b.com"], None, None)
+        assert out == ["a@b.com"]
+
+    def test_self_address_excluded(self, monkeypatch):
+        monkeypatch.setattr(pbm, "BRIDGE_USER", "me@example.com")
+        monkeypatch.setattr(pbm, "DEFAULT_FROM", "me@example.com")
+        out = pbm._external_recipients(["me@example.com"], None, None)
+        assert out == []
+
+    def test_mixed_self_and_external(self, monkeypatch):
+        monkeypatch.setattr(pbm, "BRIDGE_USER", "me@example.com")
+        monkeypatch.setattr(pbm, "DEFAULT_FROM", "me@example.com")
+        out = pbm._external_recipients(
+            ["me@example.com", "attacker@evil.com"], None, None,
+        )
+        assert out == ["attacker@evil.com"]
+
+    def test_case_insensitive_self_match(self, monkeypatch):
+        monkeypatch.setattr(pbm, "BRIDGE_USER", "Me@Example.com")
+        monkeypatch.setattr(pbm, "DEFAULT_FROM", "me@example.com")
+        out = pbm._external_recipients(["me@EXAMPLE.com"], None, None)
+        assert out == []
+
+    def test_default_from_alias_treated_as_self(self, monkeypatch):
+        # User has BRIDGE_USER as primary but DEFAULT_FROM as an alias they
+        # also own -- both should be treated as self.
+        monkeypatch.setattr(pbm, "BRIDGE_USER", "primary@example.com")
+        monkeypatch.setattr(pbm, "DEFAULT_FROM", "alias@example.com")
+        assert pbm._external_recipients(["primary@example.com"], None, None) == []
+        assert pbm._external_recipients(["alias@example.com"], None, None) == []
+
+    def test_cc_and_bcc_also_checked(self, monkeypatch):
+        monkeypatch.setattr(pbm, "BRIDGE_USER", "me@example.com")
+        monkeypatch.setattr(pbm, "DEFAULT_FROM", "me@example.com")
+        out = pbm._external_recipients(
+            ["me@example.com"],
+            cc=["copy@evil.com"],
+            bcc=["blind@evil.com"],
+        )
+        assert sorted(out) == ["blind@evil.com", "copy@evil.com"]
+
+    def test_display_name_form_extracted(self, monkeypatch):
+        # `Alice <alice@example.com>` should be treated by its bare address.
+        monkeypatch.setattr(pbm, "BRIDGE_USER", "me@example.com")
+        monkeypatch.setattr(pbm, "DEFAULT_FROM", "me@example.com")
+        out = pbm._external_recipients(
+            ["Alice <alice@evil.com>", "Me <me@example.com>"], None, None,
+        )
+        assert out == ["alice@evil.com"]
+
 
 # ----------------------------------------------------------------------------
 # _locate_bridge_cert (path search; no network)

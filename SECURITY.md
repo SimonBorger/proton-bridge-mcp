@@ -68,17 +68,33 @@ What this server protects against and what it doesn't.
   carry MCP `destructiveHint` / `idempotentHint` annotations the client can
   use to gate confirmation. `proton_send_email` and `proton_delete_email`
   carry `destructiveHint: true`.
-- **Server-side `acknowledged` requirement on the irreversible tools.**
-  `proton_send_email` and `proton_delete_email` require an explicit
-  `acknowledged=true` argument. Pydantic input validation rejects calls
-  that omit the field. The tool body returns a structured `refused` JSON
-  payload (with `reason: "acknowledged_required"`) when the field is
-  present but `false`. The aim is to make it impossible to trigger these
-  tools by passive coercion: a prompt-injection payload that simply names
-  the tool and its arguments is rejected before any side effect runs;
-  the model has to *deliberately* set `acknowledged=true`, which is the
-  point at which a well-instructed model surfaces the action to the
-  operator instead.
+- **Server-side `acknowledged` requirement on the side-effecting tools.**
+  `proton_send_email`, `proton_delete_email`, `proton_create_draft`, and
+  `proton_download_attachment` all require an explicit `acknowledged`
+  bool argument at the input layer (Pydantic `Field(...)` with no
+  default), so a prompt-injection payload that simply names the tool
+  and its arguments is rejected before any side effect runs -- the
+  model has to *deliberately* set the value, which is the point at
+  which a well-instructed model surfaces the action to the operator.
+  The body-level enforcement differs by tool:
+  - `proton_send_email` and `proton_delete_email` are *always* refused
+    on `acknowledged=false`; the tool body returns a structured
+    `refused` JSON payload (`reason: "acknowledged_required"`) without
+    resolving credentials or touching IMAP/SMTP.
+  - `proton_download_attachment` is *always* refused on
+    `acknowledged=false`. Writing attachment bytes to a user-supplied
+    `save_path` is a side effect outside the model's sandbox; a
+    prompt-injection payload could direct the write to a sensitive
+    location (LaunchAgent plist, ssh authorized_keys, etc.).
+  - `proton_create_draft` is refused on `acknowledged=false` only
+    when at least one recipient is *not* the operator's own address.
+    Drafts to non-self addresses are an exfil staging channel:
+    harvested mail composed into a draft to attacker@evil.com sits in
+    Drafts until a future click sends it. Self-only drafts are
+    accepted regardless. Self addresses are derived from
+    `PROTON_BRIDGE_USER` and `PROTON_BRIDGE_DEFAULT_FROM` (case-
+    insensitive) -- aliases not represented in either env var are
+    treated as external for this gate, which is the safe default.
 - **Prompt-injection hardening at the read boundary** (partial — see also
   the out-of-scope section below). Two layered mitigations apply to email
   content returned to the LLM:
@@ -170,11 +186,17 @@ source:
   header is added by the closest trusted MTA (Proton's own MX for
   Bridge users). Coverage is in `TestParseAuthenticationResults` in
   `tests/test_helpers.py`.
-- `SendEmailInput` and `DeleteInput` declare `acknowledged: bool = Field(...)`
+- `SendEmailInput`, `DeleteInput`, `CreateDraftInput`, and
+  `DownloadAttachmentInput` all declare `acknowledged: bool = Field(...)`
   with no default — pydantic rejects calls that omit the field. The tool
-  bodies of `proton_send_email` and `proton_delete_email` short-circuit on
-  `acknowledged=False` and return `_refused_unack(...)`. Both behaviours are
-  pinned by `TestSendEmailInputRequiresAck`, `TestDeleteInputRequiresAck`,
+  bodies of `proton_send_email`, `proton_delete_email`, and
+  `proton_download_attachment` short-circuit unconditionally on
+  `acknowledged=False` and return `_refused_unack(...)`.
+  `proton_create_draft` short-circuits only when `_external_recipients`
+  finds at least one non-self address among the recipients. Both
+  behaviours are pinned by `TestSendEmailInputRequiresAck`,
+  `TestDeleteInputRequiresAck`, `TestCreateDraftInputRequiresAck`,
+  `TestDownloadAttachmentInputRequiresAck`, `TestExternalRecipients`,
   and `TestRefusedUnack` in `tests/test_helpers.py`.
 - No credential, cert path, or message body is logged at `INFO` or `DEBUG`.
 
