@@ -385,6 +385,75 @@ class TestWrapUntrusted:
 
 
 # ----------------------------------------------------------------------------
+# _parse_authentication_results (RFC 8601 spf/dkim/dmarc extraction)
+# ----------------------------------------------------------------------------
+class TestParseAuthenticationResults:
+    @staticmethod
+    def _msg(headers: str) -> "email.message.Message":
+        return email.message_from_string(headers + "\nSubject: hi\n\nbody\n")
+
+    def test_no_header_returns_empty(self):
+        assert pbm._parse_authentication_results(self._msg("")) == {}
+
+    def test_all_pass(self):
+        m = self._msg(
+            "Authentication-Results: mx.proton.me; "
+            "spf=pass smtp.mailfrom=alice@example.com; "
+            "dkim=pass header.d=example.com header.s=sel1; "
+            "dmarc=pass action=none header.from=example.com"
+        )
+        assert pbm._parse_authentication_results(m) == {
+            "spf": "pass", "dkim": "pass", "dmarc": "pass",
+        }
+
+    def test_mixed_pass_and_fail(self):
+        m = self._msg(
+            "Authentication-Results: mx.proton.me; spf=fail; dkim=pass; dmarc=fail"
+        )
+        assert pbm._parse_authentication_results(m) == {
+            "spf": "fail", "dkim": "pass", "dmarc": "fail",
+        }
+
+    def test_uppercase_normalised_to_lowercase(self):
+        m = self._msg("Authentication-Results: mx.proton.me; SPF=PASS; DKIM=Fail")
+        assert pbm._parse_authentication_results(m) == {"spf": "pass", "dkim": "fail"}
+
+    def test_only_some_methods_present(self):
+        m = self._msg("Authentication-Results: mx.proton.me; spf=pass")
+        assert pbm._parse_authentication_results(m) == {"spf": "pass"}
+
+    def test_first_header_wins_per_method(self):
+        # Multiple A-R headers from different MTAs. The closer one (added by
+        # our own MX, conventionally topmost) takes precedence.
+        m = self._msg(
+            "Authentication-Results: mx.proton.me; spf=pass; dkim=pass\n"
+            "Authentication-Results: relay.upstream.example; spf=fail; dkim=fail"
+        )
+        out = pbm._parse_authentication_results(m)
+        assert out["spf"] == "pass"
+        assert out["dkim"] == "pass"
+
+    def test_garbage_header_returns_empty(self):
+        m = self._msg("Authentication-Results: not a structured header value")
+        assert pbm._parse_authentication_results(m) == {}
+
+    def test_dmarc_none_passes_through(self):
+        # `dmarc=none` is a real value (no DMARC policy published);
+        # not the same as the header being missing.
+        m = self._msg("Authentication-Results: mx.proton.me; dmarc=none")
+        assert pbm._parse_authentication_results(m) == {"dmarc": "none"}
+
+    def test_softfail_and_temperror_preserved(self):
+        m = self._msg(
+            "Authentication-Results: mx.proton.me; "
+            "spf=softfail; dkim=temperror; dmarc=permerror"
+        )
+        assert pbm._parse_authentication_results(m) == {
+            "spf": "softfail", "dkim": "temperror", "dmarc": "permerror",
+        }
+
+
+# ----------------------------------------------------------------------------
 # Integration: invisibles get stripped through the public helpers
 # ----------------------------------------------------------------------------
 class TestSanitisationIntegration:

@@ -97,6 +97,16 @@ What this server protects against and what it doesn't.
     than instructions. The per-call nonce prevents an attacker who
     controls the body from forging a closing tag and convincing the
     model that the trusted scope has resumed.
+  - **Sender-authentication results are surfaced in the wrapper.**
+    `proton_read_email` parses any RFC 8601 `Authentication-Results`
+    header on the message and adds the SPF / DKIM / DMARC outcome
+    tokens to the wrapper's provenance attrs (e.g.
+    `spf="fail" dkim="pass" dmarc="fail"`). A spoofed `From:` header
+    therefore reaches the model alongside the auth verdict that
+    Proton's MX recorded, rather than as an unchallenged authority
+    claim. The verdict tokens are passed through verbatim
+    (`pass` / `fail` / `softfail` / `neutral` / `none` / `temperror` /
+    `permerror`); absence of the header is itself a signal.
 
 ### Out of scope (intentionally not protected)
 
@@ -151,6 +161,14 @@ source:
   `_wrap_untrusted` before returning. The opening tag uses a
   `secrets.token_hex(3)` nonce; the closing tag uses the same nonce. Both
   characteristics are asserted by `TestWrapUntrusted` in
+  `tests/test_helpers.py`.
+- `proton_read_email` calls `_parse_authentication_results` on the message
+  and forwards the SPF / DKIM / DMARC tokens it finds into the wrapper as
+  provenance attrs and into the JSON payload's `authentication` field. The
+  parser keeps the first result it sees per method across multiple
+  `Authentication-Results` headers, on the convention that the topmost
+  header is added by the closest trusted MTA (Proton's own MX for
+  Bridge users). Coverage is in `TestParseAuthenticationResults` in
   `tests/test_helpers.py`.
 - `SendEmailInput` and `DeleteInput` declare `acknowledged: bool = Field(...)`
   with no default — pydantic rejects calls that omit the field. The tool

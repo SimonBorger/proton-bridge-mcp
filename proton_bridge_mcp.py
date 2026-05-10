@@ -503,6 +503,38 @@ def _parse_flags(meta: str) -> List[str]:
     return m.group(1).split() if m else []
 
 
+# RFC 8601 Authentication-Results: extract spf/dkim/dmarc result tokens.
+# Used to surface sender-authentication signals into the prompt-injection
+# wrapper so a spoofed `From:` header reaches the model labelled with
+# `dkim="fail"` / `spf="fail"` rather than as an authoritative-looking
+# provenance attribute.
+_AUTH_TOKEN_RE = re.compile(r"\b(spf|dkim|dmarc)\s*=\s*([A-Za-z]+)", re.IGNORECASE)
+
+
+def _parse_authentication_results(msg: email.message.Message) -> Dict[str, str]:
+    """Extract spf/dkim/dmarc results from RFC 8601 Authentication-Results
+    headers, if present. Returns {} when no header is set.
+
+    A message may carry multiple Authentication-Results headers -- one per
+    authenticating MTA in its delivery path. We scan all of them and keep
+    the *first* result we see for each method, on the convention that the
+    topmost A-R header is added by the closest trusted MTA (for Proton +
+    Bridge users that's Proton's own MX). Result tokens are normalised to
+    lowercase (e.g. `pass`, `fail`, `softfail`, `neutral`, `none`,
+    `temperror`, `permerror`). Anything we can't parse is silently
+    omitted; absence of a signal is itself information for the model.
+    """
+    out: Dict[str, str] = {}
+    for raw in msg.get_all("Authentication-Results", []) or []:
+        if not raw:
+            continue
+        for method, value in _AUTH_TOKEN_RE.findall(str(raw)):
+            key = method.lower()
+            if key not in out:
+                out[key] = value.lower()
+    return out
+
+
 def _fetch_headers(client: imaplib.IMAP4, uids: List[bytes]) -> List[Dict[str, Any]]:
     if not uids:
         return []
@@ -943,18 +975,33 @@ async def proton_read_email(params: ReadEmailInput, ctx: Context) -> str:
         subject = _decode_header(msg.get("Subject", ""))
         from_addrs = _addr_struct(msg.get("From", ""))
         from_label = ", ".join(a["email"] for a in from_addrs) or "(unknown)"
+        # Surface RFC 8601 sender-authentication results into the wrapper
+        # provenance attrs. A spoofed `From:` header otherwise reaches the
+        # model labelled `source="ceo@yourco.com"` with no signal that
+        # DKIM / SPF / DMARC failed at Proton's MX. Empty values are
+        # filtered out by `_wrap_untrusted` so missing methods simply do
+        # not render attrs.
+        auth = _parse_authentication_results(msg)
         # Wrap email bodies in nonce-tagged untrusted-data delimiters with
         # provenance, so the model sees a hard structural signal that the
         # content is data, not an instruction. Preserve length: wrap before
         # any size telemetry we emit so the operator sees what the model
         # actually receives.
         wrapped_plain = (
-            _wrap_untrusted(plain, kind="EMAIL_BODY", source=from_label, subject=subject)
+            _wrap_untrusted(
+                plain, kind="EMAIL_BODY",
+                source=from_label, subject=subject,
+                spf=auth.get("spf", ""), dkim=auth.get("dkim", ""), dmarc=auth.get("dmarc", ""),
+            )
             if plain
             else plain
         )
         wrapped_html = (
-            _wrap_untrusted(html, kind="EMAIL_BODY_HTML", source=from_label, subject=subject)
+            _wrap_untrusted(
+                html, kind="EMAIL_BODY_HTML",
+                source=from_label, subject=subject,
+                spf=auth.get("spf", ""), dkim=auth.get("dkim", ""), dmarc=auth.get("dmarc", ""),
+            )
             if html and params.include_html
             else html
         )
@@ -969,6 +1016,7 @@ async def proton_read_email(params: ReadEmailInput, ctx: Context) -> str:
             "message_id": msg.get("Message-ID"),
             "in_reply_to": msg.get("In-Reply-To"),
             "references": msg.get("References"),
+            "authentication": auth,
             "body_text": wrapped_plain,
             "attachments": attachments,
         }
