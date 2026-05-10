@@ -7,7 +7,10 @@ app-password you have to copy from Bridge's UI). Re-runnable — each step
 is skipped if already done.
 
 Run:
-    /usr/bin/python3 bootstrap.py
+    python3 bootstrap.py
+
+(Python 3.10+ is required. Apple's /usr/bin/python3 is 3.9 and will be
+auto-rejected; if a Homebrew python3.10+ exists this script re-execs under it.)
 
 Steps:
     1. Create .venv next to this script (if missing)
@@ -26,6 +29,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import ssl
 import subprocess
 import sys
@@ -65,12 +69,91 @@ def die(msg: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# 0. interpreter version
+# --------------------------------------------------------------------------- #
+def ensure_python_version() -> None:
+    """Verify we're on Python 3.10+. If not, search for a usable interpreter
+    on the system and re-exec under it; otherwise die with an install hint.
+
+    Apple's Command Line Tools `/usr/bin/python3` is 3.9 on current macOS,
+    and every entry in the hash-pinned `requirements.txt` requires 3.10+.
+    Re-execing under a Homebrew (or PATH-resolvable) interpreter when one
+    exists means `python3 bootstrap.py` Just Works regardless of which
+    interpreter the user's shell happens to resolve `python3` to.
+    """
+    if sys.version_info >= (3, 10):
+        return
+
+    current = f"{sys.version_info.major}.{sys.version_info.minor}"
+    step(f"Current interpreter is Python {current} ({sys.executable}); need 3.10+")
+
+    candidates: list[str] = [
+        "/opt/homebrew/bin/python3.13",
+        "/opt/homebrew/bin/python3.12",
+        "/opt/homebrew/bin/python3.11",
+        "/opt/homebrew/bin/python3.10",
+        "/usr/local/bin/python3.13",
+        "/usr/local/bin/python3.12",
+        "/usr/local/bin/python3.11",
+        "/usr/local/bin/python3.10",
+    ]
+    for name in ("python3.13", "python3.12", "python3.11", "python3.10"):
+        found = shutil.which(name)
+        if found and found not in candidates:
+            candidates.append(found)
+
+    for cand in candidates:
+        p = pathlib.Path(cand)
+        if p.is_file():
+            ok(f"Re-executing under {cand}")
+            # Flush before execv: in piped output mode stdout is block-buffered
+            # and execv replaces the process before the buffer is written, so
+            # the diagnostic above would otherwise vanish.
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os.execv(str(p), [str(p), str(pathlib.Path(__file__).resolve()), *sys.argv[1:]])
+            # execv replaces the current process; control does not return.
+
+    die(
+        f"Python 3.10+ required; current is {current} ({sys.executable}).\n"
+        "  Install one with:  brew install python@3.12\n"
+        "  Then re-run:       python3.12 bootstrap.py\n"
+        "  (Apple's /usr/bin/python3 is 3.9 and not supported.)"
+    )
+
+
+# --------------------------------------------------------------------------- #
 # 1. venv
 # --------------------------------------------------------------------------- #
+def _venv_python_version(venv_python: pathlib.Path) -> tuple[int, int] | None:
+    """Return (major, minor) for the venv's interpreter, or None on error."""
+    try:
+        r = subprocess.run(
+            [str(venv_python), "-c",
+             "import sys; print(sys.version_info[0], sys.version_info[1])"],
+            capture_output=True, text=True, check=True, timeout=5,
+        )
+        major, minor = (int(x) for x in r.stdout.split())
+        return (major, minor)
+    except (subprocess.SubprocessError, ValueError):
+        return None
+
+
 def ensure_venv() -> None:
-    if (VENV / "bin/python").exists():
-        skip(f"venv already at {VENV}")
-        return
+    venv_python = VENV / "bin/python"
+    if venv_python.exists():
+        # A previous run with /usr/bin/python3 (Apple CLT 3.9) leaves a 3.9
+        # venv that pip cannot populate from the hash-pinned lockfile. Detect
+        # and rebuild rather than silently skipping into a doomed install.
+        ver = _venv_python_version(venv_python)
+        if ver and ver >= (3, 10):
+            skip(f"venv already at {VENV} (Python {ver[0]}.{ver[1]})")
+            return
+        if ver is None:
+            step(f"Existing venv at {VENV} is unusable; rebuilding")
+        else:
+            step(f"Existing venv is Python {ver[0]}.{ver[1]}; rebuilding for 3.10+")
+        shutil.rmtree(VENV, ignore_errors=True)
     step("Creating Python venv")
     venv.create(VENV, with_pip=True)
     ok(f"venv at {VENV}")
@@ -238,6 +321,10 @@ def merge_config(user: str) -> None:
 def main() -> None:
     if sys.platform != "darwin":
         die("This bootstrap uses macOS Keychain and paths; macOS only.")
+
+    # Must run before anything that depends on the venv, since this may
+    # re-exec the script under a different interpreter.
+    ensure_python_version()
 
     force_password = "--force-password" in sys.argv
 

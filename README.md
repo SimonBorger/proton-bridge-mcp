@@ -50,7 +50,7 @@ Several other Proton MCP servers exist on GitHub. Most are functional and some h
 
 - macOS (Keychain integration is macOS-specific)
 - Proton Mail Bridge installed, running, and logged in
-- Python 3.10 or later (tested on 3.10, 3.12, and 3.14)
+- Python 3.10 or later (tested on 3.10, 3.12, and 3.14). **Apple's `/usr/bin/python3` is 3.9 on current macOS and is not supported** — install a newer interpreter via Homebrew (`brew install python@3.12`) or python.org. The bootstrap script auto-detects a Homebrew Python 3.10+ and re-execs under it if you launch it from too old an interpreter, but the manual install path needs you to invoke a 3.10+ `python3` directly.
 - Bridge **username** (your email) and **app-password**, copied from Bridge → *Mailbox details*. This is **not** your Proton account password.
 
 ## Install
@@ -61,7 +61,7 @@ There are two paths. Use **A** unless you want fine control over each step.
 
 ```bash
 cd <install-path>/proton-bridge-mcp
-/usr/bin/python3 bootstrap.py
+python3 bootstrap.py
 ```
 
 `bootstrap.py` is idempotent and re-runnable. It:

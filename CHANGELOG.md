@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+- `bootstrap.py` now refuses to run under Python <3.10 instead of silently building a doomed venv. If a Homebrew (or PATH-resolvable) `python3.10`/`3.11`/`3.12`/`3.13` interpreter is available, the script re-execs itself under that interpreter; otherwise it dies with a `brew install python@3.12` hint. Apple's `/usr/bin/python3` is 3.9 on current macOS Command Line Tools, and the hash-pinned `requirements.txt` contains packages (e.g. `anyio==4.13.0`) that require 3.10+ — running the bootstrap with the system Python would previously fail inside `pip install --require-hashes` with a misleading "no matching distribution" error against `anyio` rather than the real cause.
+- `bootstrap.py`'s `ensure_venv()` now verifies the existing venv's Python version and rebuilds it if it's <3.10. A previous failed run with the system Python would otherwise leave a 3.9 venv in place that subsequent runs silently reused.
+- `install.sh` now gates the venv creation on `python3 --version >= 3.10` for the same reason and exits with the same Homebrew install hint when the available `python3` is too old.
+- README's Path A install instruction changed from `/usr/bin/python3 bootstrap.py` to `python3 bootstrap.py`, with the Prerequisites section explicitly calling out that Apple's `/usr/bin/python3` is 3.9 and not supported.
+
 ## [0.3.0] - 2026-05-09
 
 ### Added

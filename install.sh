@@ -10,6 +10,17 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+# Reject Apple's /usr/bin/python3 (3.9) and any other pre-3.10 interpreter:
+# the hash-pinned lockfile contains packages that require >=3.10 and pip will
+# fail in a confusing way otherwise.
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
+  echo "Python 3.10+ required; got $(python3 -V 2>&1)." >&2
+  echo "Install one with:  brew install python@3.12" >&2
+  echo "Then invoke this script with that interpreter on PATH, e.g.:" >&2
+  echo "  PATH=/opt/homebrew/bin:\"\$PATH\" ./install.sh" >&2
+  exit 1
+fi
+
 python3 -m venv .venv
 # shellcheck disable=SC1091
 source .venv/bin/activate
