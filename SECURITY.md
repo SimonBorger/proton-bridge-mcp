@@ -144,6 +144,22 @@ What this server protects against and what it doesn't.
   explicit per-action user confirmation in the MCP client. The server
   provides the primitives and the layered defences; the client and the
   operator provide the policy.
+- **Read-side exfiltration via the model.** The `acknowledged=true` gate
+  on the side-effecting tools and the prompt-injection wrapper protect
+  against destructive actions being triggered by inbound mail content.
+  They do *not* prevent a sufficiently capable injection from coaxing the
+  model into reading additional mail (the read tools have no `acknowledged`
+  gate by design — gating them would make the server unusable) and
+  surfacing those contents into the conversation, where the attacker
+  receives them via the next reply the model composes, or via any other
+  channel the model can write to. The read tools are *how the server is
+  useful at all*; their natural behaviour is data flowing into the
+  model's context. If the operator has the model auto-respond to mail
+  or otherwise act on its read context, that path is exfiltration. The
+  mitigation is operator policy: do not have the model auto-respond on
+  inboxes that may receive injected content; treat the LLM provider as
+  having read-access to every email Claude reads via this tool, because
+  it does.
 - **Attacks against Proton's infrastructure or end-to-end-encryption design.**
   Out of this repo's hands.
 - **Non-macOS platforms.** Linux and Windows are unsupported. Bridge runs

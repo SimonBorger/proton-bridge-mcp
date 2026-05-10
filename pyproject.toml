@@ -87,3 +87,55 @@ py-modules = ["proton_bridge_mcp"]
 # the registry submission -- to `server.json` (which is updated manually
 # in the same commit).
 version = { attr = "proton_bridge_mcp.__version__" }
+
+[tool.bandit]
+# Project-level configuration for the bandit SAST CI job. The skips below
+# are categories that fire only on idioms we use deliberately and would
+# otherwise drown the signal-to-noise ratio in known-acceptable findings.
+# Each skip is *justified*; future contributors should reconsider any
+# entry rather than treating the list as load-bearing.
+#
+# Tests are excluded from the scan: the unit tests use assert (B101) and
+# hardcoded test data heavily, both of which are non-issues there.
+exclude_dirs = ["tests", ".venv", "__pycache__"]
+skips = [
+    # B101: assert_used.
+    #   We never run with -O (PYTHONOPTIMIZE), so asserts are not
+    #   stripped. The handful of asserts in this codebase are type guards
+    #   and invariants ("self.client is not None after pool reconnect"),
+    #   not security checks.
+    "B101",
+    # B110: try_except_pass.
+    #   Used exclusively in best-effort cleanup paths (IMAP logout that
+    #   may already be torn down, chmod that may not be supported on the
+    #   filesystem). Swallowing the exception is the correct behaviour;
+    #   the cleanup is an attempt, not a guarantee.
+    "B110",
+    # B404: blacklist (subprocess import).
+    #   subprocess is imported deliberately for macOS Keychain access
+    #   via `/usr/bin/security`, which is an explicit design choice
+    #   (see _keychain_password and SECURITY.md). The import itself is
+    #   not an issue; specific calls are individually safe (see B603).
+    "B404",
+    # B603: subprocess_without_shell_equals_true.
+    #   Every subprocess.run() call in this codebase uses a hardcoded
+    #   absolute binary path (`/usr/bin/security`, the venv's pip), with
+    #   user-influenced data (BRIDGE_USER) passed as a separate argv
+    #   element via `-a`, not interpolated into a shell string. shell=True
+    #   is never used. There is no execve-of-untrusted-input concern.
+    "B603",
+    # B606: start_process_with_no_shell.
+    #   Fires on bootstrap.py's `os.execv` for the Python<3.10 re-exec.
+    #   The target is selected from a hardcoded candidate list of
+    #   well-known Homebrew/system paths plus `shutil.which("python3.1X")`
+    #   results -- never user input.
+    "B606",
+    # B613: trojansource.
+    #   Fires on the `_INVISIBLE_CHARS` regex literal, which by design
+    #   contains the bidi-override and zero-width Unicode that it
+    #   exists to strip from inbound email content. This is the
+    #   trojan-source mitigation, not a trojan-source vulnerability.
+    #   See _strip_invisibles in proton_bridge_mcp.py and
+    #   TestStripInvisibles in tests/test_helpers.py.
+    "B613",
+]

@@ -135,3 +135,51 @@ jobs:
           .venv/bin/pip install --require-hashes --quiet -r requirements-dev.txt
       - name: Run pytest
         run: .venv/bin/python -m pytest tests/ -v
+
+  bandit:
+    # Python SAST. Configuration (skips and exclude_dirs) lives in
+    # `[tool.bandit]` in pyproject.toml; each skip there is justified
+    # with a comment explaining why the category is universally noise
+    # in this codebase.
+    #
+    # bandit is intentionally not pinned -- it's a security tool whose
+    # value comes from staying current with new check categories. An
+    # attacker compromising the bandit wheel to silence findings is a
+    # theoretical concern but a real one only if bandit's release process
+    # is breached, which is the kind of thing we'd hear about. Trade-off
+    # accepted.
+    name: Bandit (Python SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install bandit
+        run: pip install --quiet bandit
+      - name: Run bandit
+        run: bandit -c pyproject.toml -r proton_bridge_mcp.py bootstrap.py
+
+  pip-audit:
+    # PyPA Advisory Database vulnerability scan. Catches CVEs in the
+    # locked transitive dependency graph that hash-pinning alone does
+    # not (hash-pinning protects against tampered wheels, not against
+    # known-vulnerable versions). Audits both the runtime lockfile and
+    # the dev lockfile -- a vuln in a dev dep can compromise CI.
+    #
+    # `--strict` upgrades skipped advisories (e.g. for dependencies that
+    # pip-audit cannot resolve) into failures, so a dependency change
+    # that breaks the audit cannot silently slip through.
+    name: pip-audit (PyPA Advisory DB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: "3.12"
+      - name: Install pip-audit
+        run: pip install --quiet pip-audit
+      - name: Audit runtime lockfile
+        run: pip-audit -r requirements.txt --strict
+      - name: Audit dev lockfile
+        run: pip-audit -r requirements-dev.txt --strict

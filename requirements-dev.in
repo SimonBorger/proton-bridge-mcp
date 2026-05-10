@@ -11,4 +11,8 @@
 # CI installs `requirements-dev.txt` for the test job; end-users continue to
 # install `requirements.txt`.
 
-pytest>=7,<9
+# pytest 9.0.3 is the floor that fixes CVE-2025-71176 (surfaced by the
+# pip-audit CI job against the dev lockfile). 8.x is unsupported because
+# of that advisory; verified against `pip index versions pytest` --
+# 9.0.3 is the only available fix release.
+pytest>=9.0.3,<10
