@@ -90,6 +90,9 @@ logging.basicConfig(
 BRIDGE_HOST = os.environ.get("PROTON_BRIDGE_HOST", "127.0.0.1")
 BRIDGE_IMAP_PORT = int(os.environ.get("PROTON_BRIDGE_IMAP_PORT", "1143"))
 BRIDGE_SMTP_PORT = int(os.environ.get("PROTON_BRIDGE_SMTP_PORT", "1025"))
+# LOCAL PATCH (siborg): Bridge on macOS defaults SMTP to SSL (TLS-first) mode.
+# "starttls" (upstream behaviour) or "ssl" (SMTPS, connect over TLS immediately).
+BRIDGE_SMTP_SECURITY = os.environ.get("PROTON_BRIDGE_SMTP_SECURITY", "starttls").lower()
 BRIDGE_USER = os.environ.get("PROTON_BRIDGE_USER", "")
 BRIDGE_CERT_PATH = os.environ.get("PROTON_BRIDGE_CERT_PATH", "")
 TLS_POLICY = os.environ.get("PROTON_BRIDGE_TLS_POLICY", "pinned").lower()
@@ -1266,6 +1269,15 @@ async def proton_send_email(params: SendEmailInput, ctx: Context) -> str:
         rcpts = _all_rcpts(params.to, params.cc, params.bcc)
 
         def _smtp_send():
+            # LOCAL PATCH (siborg): support Bridge's SSL (TLS-first) SMTP mode.
+            if BRIDGE_SMTP_SECURITY == "ssl":
+                with smtplib.SMTP_SSL(
+                    BRIDGE_HOST, BRIDGE_SMTP_PORT, timeout=30, context=_ssl_context()
+                ) as smtp:
+                    smtp.ehlo()
+                    smtp.login(BRIDGE_USER, pw)
+                    smtp.send_message(msg, from_addr=parseaddr(sender)[1], to_addrs=rcpts)
+                return
             with smtplib.SMTP(BRIDGE_HOST, BRIDGE_SMTP_PORT, timeout=30) as smtp:
                 smtp.ehlo()
                 smtp.starttls(context=_ssl_context())
